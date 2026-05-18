@@ -10,9 +10,9 @@ if (isset($_SESSION["user_id"])) {
 $email  = "";
 $errors = [];
 
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $email    = trim($_POST["email"]);
-    $password = $_POST["password"];
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    $email    = trim($_POST["email"] ?? "");
+    $password = $_POST["password"] ?? "";
 
     if (empty($email)) {
         $errors[] = "Email is required";
@@ -20,22 +20,38 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $errors[] = "Please enter a valid email address";
     }
 
-    if (empty($password)) $errors[] = "Password is required";
+    if (empty($password)) {
+        $errors[] = "Password is required";
+    }
 
     if (empty($errors)) {
-        $stmt = $conn->prepare("SELECT user_id, full_name, role, password FROM users WHERE email = ?");
+        $sql = "SELECT user_id, full_name, role, password FROM users WHERE email = ? LIMIT 1";
+
+        $stmt = $conn->prepare($sql);
+
+        if (!$stmt) {
+            die("SQL prepare failed: " . $conn->error);
+        }
+
         $stmt->bind_param("s", $email);
-        $stmt->execute();
+
+        if (!$stmt->execute()) {
+            die("SQL execute failed: " . $stmt->error);
+        }
+
         $result = $stmt->get_result();
 
-        if ($result && $result->num_rows > 0) {
+        if ($result && $result->num_rows === 1) {
             $row = $result->fetch_assoc();
+
             if (password_verify($password, $row["password"])) {
                 session_regenerate_id(true);
+
                 $_SESSION["user_id"]       = $row["user_id"];
                 $_SESSION["full_name"]     = $row["full_name"];
                 $_SESSION["role"]          = $row["role"];
                 $_SESSION["last_activity"] = time();
+
                 header("Location: /index.php");
                 exit();
             } else {
@@ -44,6 +60,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         } else {
             $errors[] = "Invalid email or password";
         }
+
         $stmt->close();
     }
 }
@@ -63,14 +80,18 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         <?php if (!empty($errors)): ?>
             <div class="notice error" style="text-align:left; margin-bottom:15px;">
                 <?php foreach ($errors as $e): ?>
-                    <p style="margin:4px 0; font-size:0.9rem;"><?php echo htmlspecialchars($e); ?></p>
+                    <p style="margin:4px 0; font-size:0.9rem;">
+                        <?php echo htmlspecialchars($e); ?>
+                    </p>
                 <?php endforeach; ?>
             </div>
         <?php endif; ?>
 
         <?php if (isset($_GET["timeout"])): ?>
             <div class="notice" style="background:#fff8e1; border-left-color:#f9a825; margin-bottom:15px;">
-                <p style="color:#f57f17; margin:0; font-size:0.9rem;">Session expired. Please log in again.</p>
+                <p style="color:#f57f17; margin:0; font-size:0.9rem;">
+                    Session expired. Please log in again.
+                </p>
             </div>
         <?php endif; ?>
 
@@ -80,9 +101,23 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         </p>
 
         <form action="login.php" method="post">
-            <input type="email"    name="email"    placeholder="Email address" class="input-box"
-                   value="<?php echo htmlspecialchars($email); ?>" required>
-            <input type="password" name="password" placeholder="Password" class="input-box" required>
+            <input 
+                type="email" 
+                name="email" 
+                placeholder="Email address" 
+                class="input-box"
+                value="<?php echo htmlspecialchars($email); ?>" 
+                required
+            >
+
+            <input 
+                type="password" 
+                name="password" 
+                placeholder="Password" 
+                class="input-box" 
+                required
+            >
+
             <button type="submit" class="btn-block">Log in</button>
         </form>
     </div>
