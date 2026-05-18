@@ -12,7 +12,7 @@ $errors = [];
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
     $email    = trim($_POST["email"] ?? "");
-    $password = $_POST["password"] ?? "";
+    $password = trim($_POST["password"] ?? "");
 
     if (empty($email)) {
         $errors[] = "Email is required";
@@ -25,7 +25,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     }
 
     if (empty($errors)) {
-        $sql = "SELECT user_id, full_name, role, password FROM users WHERE email = ? LIMIT 1";
+        $sql = "SELECT user_id, full_name, role, password 
+                FROM users 
+                WHERE email = ? 
+                LIMIT 1";
 
         $stmt = $conn->prepare($sql);
 
@@ -44,7 +47,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         if ($result && $result->num_rows === 1) {
             $row = $result->fetch_assoc();
 
-            if (password_verify($password, $row["password"])) {
+            $storedPassword = trim($row["password"]);
+
+            // Works for both plain text and hashed passwords
+            $passwordIsCorrect = password_verify($password, $storedPassword) || $password === $storedPassword;
+
+            if ($passwordIsCorrect) {
                 session_regenerate_id(true);
 
                 $_SESSION["user_id"]       = $row["user_id"];
@@ -60,9 +68,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         } else {
             $errors[] = "Invalid email or password";
         }
-$storedPassword = $row["password"];
 
-$passwordIsCorrect = password_verify($password, $storedPassword) || $password === $storedPassword;
         $stmt->close();
     }
 }
