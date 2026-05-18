@@ -1,33 +1,37 @@
 <?php
-// Prevent mysqli from throwing unhandled fatal exceptions and breaking the layout
+// connectdb.php
+
+// Stop mysqli from throwing fatal exceptions
 mysqli_report(MYSQLI_REPORT_OFF);
 
-$host   = "gateway01.us-east-1.prod.aws.tidbcloud.com";
-$user   = "49r5VHQULjxi3Up.root";
-$pass   = "pNrrdzsMgW5uYz3J";
-$dbname = "brooder_system";
-$port   = 4000;
+// Get database details from Render Environment Variables
+$host   = getenv("DB_HOST");
+$user   = getenv("DB_USER");
+$pass   = getenv("DB_PASSWORD");
+$dbname = getenv("DB_NAME");
+$port   = getenv("DB_PORT") ?: 4000;
 
-// 1. Initialize the connection object
 $conn = mysqli_init();
 
 if (!$conn) {
     die("Database initialization failed.");
 }
 
-// 2. Establish the connection while explicitly forcing standard TLS/SSL encryption
-$success = @mysqli_real_connect(
-    $conn, 
-    $host, 
-    $user, 
-    $pass, 
-    $dbname, 
-    $port, 
-    NULL, 
+// TiDB Cloud needs SSL
+$success = mysqli_real_connect(
+    $conn,
+    $host,
+    $user,
+    $pass,
+    $dbname,
+    (int)$port,
+    null,
     MYSQLI_CLIENT_SSL
 );
 
 if (!$success) {
     die("Database connection failed: " . mysqli_connect_error());
 }
+
+$conn->set_charset("utf8mb4");
 ?>
