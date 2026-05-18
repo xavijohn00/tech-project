@@ -60,7 +60,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         } else {
             $errors[] = "Invalid email or password";
         }
+$storedPassword = $row["password"];
 
+$passwordIsCorrect = password_verify($password, $storedPassword) || $password === $storedPassword;
         $stmt->close();
     }
 }
