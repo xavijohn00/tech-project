@@ -9,6 +9,7 @@ if (isset($_SESSION["user_id"])) {
 
 $email  = "";
 $errors = [];
+$passwordIsCorrect = false;
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
     $email    = trim($_POST["email"] ?? "");
