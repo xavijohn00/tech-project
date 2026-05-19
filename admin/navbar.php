@@ -6,6 +6,7 @@
         <a href="/admin/manage_users.php"   class="<?php echo $page==='manage_users.php'  ?'active':''; ?>">Users</a>
         <a href="/admin/manage_brooders.php"class="<?php echo $page==='manage_brooders.php'?'active':''; ?>">Brooders</a>
         <a href="/admin/assign.php"         class="<?php echo $page==='assign.php'         ?'active':''; ?>">Assignments</a>
+        <a href="/admin/logs.php"           class="<?php echo $page==='logs.php'           ?'active':''; ?>">Logs</a>
     </div>
     <div class="nav-right">
         <img src="/images/Notifications_Bell_Outline.png" class="alert-icon" onclick="alert('No new alerts')">
@@ -14,7 +15,6 @@
     <div id="dropdown" class="dropdown">
         <p style="margin:0 0 4px; font-size:0.85rem; color:#999;"><?php echo htmlspecialchars($current_full_name); ?></p>
         <p style="margin:0 0 10px; font-size:0.8rem; color:var(--teal);">Administrator</p>
-        <a href="/change_password.php" style="display:block; margin-bottom:8px; color:#444; text-decoration:none;">Change Password</a>
         <a href="/auth/logout.php" style="color:var(--green); font-weight:bold; text-decoration:none;">Sign Out</a>
     </div>
 </div>
