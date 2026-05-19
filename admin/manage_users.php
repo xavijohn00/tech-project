@@ -4,13 +4,14 @@ require_once "../auth/connectdb.php";
 if ($current_role !== 'admin') { header("Location: /index.php"); exit(); }
 
 $success = $errors = [];
+$default_password = "SALCC1234";
 
 // Create user
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action"]) && $_POST["action"] === "create") {
     $full_name = trim($_POST["full_name"]);
     $email     = trim($_POST["email"]);
     $role      = $_POST["role"];
-    $password  = password_hash("SALCC1234", PASSWORD_DEFAULT); // default password
+    $password  = password_hash($default_password, PASSWORD_DEFAULT); // default password
 
     if (empty($full_name)) $errors[] = "Full name is required";
     if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) $errors[] = "Valid email is required";
@@ -20,12 +21,30 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action"]) && $_POST["
         $stmt = $conn->prepare("INSERT INTO users (full_name, email, password, role) VALUES (?,?,?,?)");
         $stmt->bind_param("ssss", $full_name, $email, $password, $role);
         if ($stmt->execute()) {
-            $success[] = "User created. Default password: SALCC1234";
+            $success[] = "User created. Default password: " . $default_password;
         } else {
             $errors[] = "Email already exists";
         }
         $stmt->close();
     }
+}
+
+// Reset user password
+if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action"]) && $_POST["action"] === "reset_password") {
+    $uid = intval($_POST["user_id"]);
+    $password = password_hash($default_password, PASSWORD_DEFAULT);
+
+    $stmt = $conn->prepare("UPDATE users SET password = ? WHERE user_id = ? AND role != 'admin'");
+    $stmt->bind_param("si", $password, $uid);
+    $stmt->execute();
+
+    if ($stmt->affected_rows > 0) {
+        $success[] = "Password reset. Default password: " . $default_password;
+    } else {
+        $errors[] = "Password could not be reset for this user";
+    }
+
+    $stmt->close();
 }
 
 // Delete user
@@ -68,7 +87,7 @@ $users = $conn->query("SELECT user_id, full_name, email, role, created_at FROM u
                 <option value="lecturer">Lecturer</option>
                 <option value="admin">Admin</option>
             </select>
-            <p style="font-size:0.85rem; color:var(--teal); margin:6px 0;">Default password will be: <strong>SALCC1234</strong></p>
+            <p style="font-size:0.85rem; color:var(--teal); margin:6px 0;">Default password will be: <strong><?php echo htmlspecialchars($default_password); ?></strong></p>
             <button type="submit" class="btn">Create User</button>
         </form>
     </div>
@@ -86,6 +105,11 @@ $users = $conn->query("SELECT user_id, full_name, email, role, created_at FROM u
                 <td><?php echo date("d M Y", strtotime($u["created_at"])); ?></td>
                 <td>
                     <?php if ($u["role"] !== "admin"): ?>
+                    <form method="post" style="display:inline;" onsubmit="return confirm('Reset this user password to the default?')">
+                        <input type="hidden" name="action"  value="reset_password">
+                        <input type="hidden" name="user_id" value="<?php echo $u["user_id"]; ?>">
+                        <button type="submit" class="btn secondary" style="width:auto; padding:6px 12px; font-size:0.8rem;">Reset Password</button>
+                    </form>
                     <form method="post" style="display:inline;" onsubmit="return confirm('Delete this user?')">
                         <input type="hidden" name="action"  value="delete">
                         <input type="hidden" name="user_id" value="<?php echo $u["user_id"]; ?>">
