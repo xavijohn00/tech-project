@@ -33,18 +33,38 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action"]) && $_POST["
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action"]) && $_POST["action"] === "reset_password") {
     $uid = intval($_POST["user_id"]);
     $password = password_hash($default_password, PASSWORD_DEFAULT);
+    $target_name = "";
 
-    $stmt = $conn->prepare("UPDATE users SET password = ? WHERE user_id = ? AND role != 'admin'");
-    $stmt->bind_param("si", $password, $uid);
-    $stmt->execute();
+    $user_stmt = $conn->prepare("SELECT full_name FROM users WHERE user_id = ? AND role != 'admin' LIMIT 1");
+    $user_stmt->bind_param("i", $uid);
+    $user_stmt->execute();
+    $target_user = $user_stmt->get_result()->fetch_assoc();
+    $user_stmt->close();
 
-    if ($stmt->affected_rows > 0) {
-        $success[] = "Password reset. Default password: " . $default_password;
-    } else {
+    if (!$target_user) {
         $errors[] = "Password could not be reset for this user";
-    }
+    } else {
+        $target_name = $target_user["full_name"];
 
-    $stmt->close();
+        $stmt = $conn->prepare("UPDATE users SET password = ? WHERE user_id = ? AND role != 'admin'");
+        $stmt->bind_param("si", $password, $uid);
+        $stmt->execute();
+
+        if ($stmt->affected_rows > 0) {
+            $success[] = "Password reset for " . $target_name . ". Default password: " . $default_password;
+
+            $event_type = "password_reset";
+            $description = "Admin reset password for " . $target_name . " to the default password.";
+            $log_stmt = $conn->prepare("INSERT INTO system_logs (user_id, event_type, description) VALUES (?,?,?)");
+            $log_stmt->bind_param("iss", $current_user_id, $event_type, $description);
+            $log_stmt->execute();
+            $log_stmt->close();
+        } else {
+            $errors[] = "Password could not be reset for this user";
+        }
+
+        $stmt->close();
+    }
 }
 
 // Delete user
@@ -58,6 +78,16 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action"]) && $_POST["
 }
 
 $users = $conn->query("SELECT user_id, full_name, email, role, created_at FROM users ORDER BY role, full_name");
+$logs = $conn->query("
+    SELECT sl.log_id, sl.event_type, sl.description, sl.logged_at,
+           u.full_name, u.role,
+           b.name AS brooder_name
+    FROM system_logs sl
+    LEFT JOIN users u ON u.user_id = sl.user_id
+    LEFT JOIN brooders b ON b.brooder_id = sl.brooder_id
+    ORDER BY sl.logged_at DESC
+    LIMIT 25
+");
 ?>
 <!DOCTYPE html>
 <html id="top">
@@ -120,6 +150,26 @@ $users = $conn->query("SELECT user_id, full_name, email, role, created_at FROM u
             </tr>
             <?php endwhile; ?>
         </table>
+    </div>
+
+    <!-- Recent logs -->
+    <div class="card" style="margin-top:30px;">
+        <h3>Recent System Logs</h3>
+        <p style="font-size:0.85rem; color:var(--teal); margin:0 0 12px;">Showing the 25 most recent logs.</p>
+        <table>
+            <tr><th>Time</th><th>User</th><th>Role</th><th>Brooder</th><th>Event</th><th>Description</th></tr>
+            <?php while ($l = $logs->fetch_assoc()): ?>
+            <tr>
+                <td style="font-size:0.8rem; white-space:nowrap;"><?php echo htmlspecialchars($l["logged_at"]); ?></td>
+                <td><?php echo htmlspecialchars($l["full_name"] ?? "System"); ?></td>
+                <td style="text-transform:capitalize;"><?php echo htmlspecialchars($l["role"] ?? "-"); ?></td>
+                <td><?php echo htmlspecialchars($l["brooder_name"] ?? "-"); ?></td>
+                <td style="font-family:monospace; font-size:0.8rem;"><?php echo htmlspecialchars($l["event_type"]); ?></td>
+                <td style="font-size:0.85rem;"><?php echo htmlspecialchars($l["description"] ?? ""); ?></td>
+            </tr>
+            <?php endwhile; ?>
+        </table>
+        <a href="/admin/logs.php" class="btn secondary" style="display:inline-block; width:auto; padding:8px 16px; text-decoration:none; margin-top:12px;">View All Logs</a>
     </div>
 </div>
 <?php include "../auth/footer.php"; ?>
