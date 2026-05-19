@@ -9,11 +9,10 @@ if (isset($_SESSION["user_id"])) {
 
 $email  = "";
 $errors = [];
-$passwordIsCorrect = false;
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
     $email    = trim($_POST["email"] ?? "");
-    $password = trim($_POST["password"] ?? "");
+    $password = $_POST["password"] ?? "";
 
     if (empty($email)) {
         $errors[] = "Email is required";
@@ -48,10 +47,29 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         if ($result && $result->num_rows === 1) {
             $row = $result->fetch_assoc();
 
-            $storedPassword = trim($row["password"]);
+            $storedPassword = $row["password"];
+            $passwordInfo   = password_get_info($storedPassword);
+            $passwordIsHash = $passwordInfo["algo"] !== 0;
 
+            if ($passwordIsHash) {
+                $passwordIsCorrect = password_verify($password, $storedPassword);
+            } else {
+                // Legacy support for users imported before passwords were hashed.
+                $passwordIsCorrect = hash_equals($storedPassword, $password);
+            }
 
             if ($passwordIsCorrect) {
+                if (!$passwordIsHash || password_needs_rehash($storedPassword, PASSWORD_DEFAULT)) {
+                    $newHash = password_hash($password, PASSWORD_DEFAULT);
+                    $updateStmt = $conn->prepare("UPDATE users SET password = ? WHERE user_id = ?");
+
+                    if ($updateStmt) {
+                        $updateStmt->bind_param("si", $newHash, $row["user_id"]);
+                        $updateStmt->execute();
+                        $updateStmt->close();
+                    }
+                }
+
                 session_regenerate_id(true);
 
                 $_SESSION["user_id"]       = $row["user_id"];
