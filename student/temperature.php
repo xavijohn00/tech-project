@@ -23,7 +23,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && $brooder) {
     if ($target_temp <= 0) {
         $errors[] = "Please enter a valid temperature";
     } else {
-        $response = flask_call('POST', '/api/settings', [
+        $response = flask_call('POST', '/api/settings', $brooder["api_key"], [
             'target_temp' => $target_temp,
             'student_id'  => $current_user_id
         ]);
@@ -39,10 +39,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && $brooder) {
 // Get latest data from Flask
 $latest = $target = null;
 if ($brooder) {
-    $reading = flask_call('GET', '/api/readings');
+    $reading = flask_call('GET', '/api/readings', $brooder["api_key"]);
     if ($reading['status'] === 200) $latest = $reading['data'];
 
-    $setting = flask_call('GET', '/api/settings');
+    $setting = flask_call('GET', '/api/settings', $brooder["api_key"]);
     if ($setting['status'] === 200) $target = $setting['data']['target_temp'];
 }
 ?>
