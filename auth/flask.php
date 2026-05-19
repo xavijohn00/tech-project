@@ -1,14 +1,13 @@
 <?php
 define('FLASK_URL', 'https://your-render-url.onrender.com');
-define('FLASK_KEY', 'brooder-a-api-key-changeme');
 
-function flask_call($method, $endpoint, $body = []) {
+function flask_call($method, $endpoint, $api_key, $body = []) {
     $ch = curl_init(FLASK_URL . $endpoint);
 
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_HTTPHEADER, [
         'Content-Type: application/json',
-        'Authorization: Bearer ' . FLASK_KEY
+        'Authorization: Bearer ' . $api_key
     ]);
 
     if ($method === 'POST') {
