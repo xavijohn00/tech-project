@@ -49,8 +49,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
             $storedPassword = trim($row["password"]);
 
-            // Works for both plain text and hashed passwords
-            $passwordIsCorrect = password_verify($password, $storedPassword) || $password === $storedPassword;
 
             if ($passwordIsCorrect) {
                 session_regenerate_id(true);
