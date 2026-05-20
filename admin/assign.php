@@ -9,20 +9,61 @@ $success = $errors = [];
 if ($_SERVER["REQUEST_METHOD"] === "POST" && $_POST["action"] === "assign_brooder") {
     $student_id = intval($_POST["student_id"]);
     $brooder_id = intval($_POST["brooder_id"]);
-    $stmt = $conn->prepare("INSERT INTO student_brooder (student_id, brooder_id) VALUES (?,?) ON DUPLICATE KEY UPDATE brooder_id=?");
-    $stmt->bind_param("iii", $student_id, $brooder_id, $brooder_id);
-    $stmt->execute() ? $success[] = "Brooder assigned" : $errors[] = "Already assigned";
-    $stmt->close();
+
+    if ($student_id <= 0 || $brooder_id <= 0) {
+        $errors[] = "Please select a student and brooder";
+    } else {
+        $conn->begin_transaction();
+
+        try {
+            // One student gets one brooder, and one brooder belongs to one student.
+            $delete = $conn->prepare("DELETE FROM student_brooder WHERE student_id = ? OR brooder_id = ?");
+            if (!$delete) throw new Exception($conn->error);
+            $delete->bind_param("ii", $student_id, $brooder_id);
+            if (!$delete->execute()) throw new Exception($delete->error);
+            $delete->close();
+
+            $insert = $conn->prepare("INSERT INTO student_brooder (student_id, brooder_id) VALUES (?,?)");
+            if (!$insert) throw new Exception($conn->error);
+            $insert->bind_param("ii", $student_id, $brooder_id);
+            if (!$insert->execute()) throw new Exception($insert->error);
+            $insert->close();
+
+            $conn->commit();
+            $success[] = "Brooder assigned";
+        } catch (Exception $e) {
+            $conn->rollback();
+            $errors[] = "Error assigning brooder: " . $e->getMessage();
+        }
+    }
 }
 
 // Assign student to lecturer
 if ($_SERVER["REQUEST_METHOD"] === "POST" && $_POST["action"] === "assign_lecturer") {
     $lecturer_id = intval($_POST["lecturer_id"]);
     $student_id  = intval($_POST["student_id"]);
-    $stmt = $conn->prepare("INSERT IGNORE INTO lecturer_student (lecturer_id, student_id) VALUES (?,?)");
-    $stmt->bind_param("ii", $lecturer_id, $student_id);
-    $stmt->execute() ? $success[] = "Student assigned to lecturer" : $errors[] = "Error assigning";
-    $stmt->close();
+
+    if ($lecturer_id <= 0 || $student_id <= 0) {
+        $errors[] = "Please select a lecturer and student";
+    } else {
+        $stmt = $conn->prepare("INSERT IGNORE INTO lecturer_student (lecturer_id, student_id) VALUES (?,?)");
+
+        if (!$stmt) {
+            $errors[] = "Error assigning student: " . $conn->error;
+        } else {
+            $stmt->bind_param("ii", $lecturer_id, $student_id);
+
+            if ($stmt->execute()) {
+                $success[] = $stmt->affected_rows > 0
+                    ? "Student assigned to lecturer"
+                    : "Student was already assigned to this lecturer";
+            } else {
+                $errors[] = "Error assigning student: " . $stmt->error;
+            }
+
+            $stmt->close();
+        }
+    }
 }
 
 $students  = $conn->query("SELECT user_id, full_name FROM users WHERE role='student' ORDER BY full_name");
