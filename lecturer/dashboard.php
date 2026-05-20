@@ -6,21 +6,25 @@ if ($current_role !== 'lecturer') { header("Location: /index.php"); exit(); }
 
 $stmt = $conn->prepare("
     SELECT u.full_name, u.user_id,
-           b.brooder_id, b.api_key, b.name AS brooder_name, b.location,
-           ts.target_temp
+           b.brooder_id, b.name AS brooder_name, b.location
     FROM lecturer_student ls
     JOIN users u ON u.user_id = ls.student_id
     LEFT JOIN student_brooder sb ON sb.student_id = u.user_id
     LEFT JOIN brooders b ON b.brooder_id = sb.brooder_id
-    LEFT JOIN brooder_settings ts ON ts.brooder_id = b.brooder_id
-        AND ts.setting_id = (SELECT MAX(setting_id) FROM brooder_settings WHERE brooder_id = b.brooder_id)
     WHERE ls.lecturer_id = ?
     ORDER BY u.full_name
 ");
-$stmt->bind_param("i", $current_user_id);
-$stmt->execute();
-$students = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-$stmt->close();
+$students = [];
+$query_error = "";
+
+if (!$stmt) {
+    $query_error = "Could not load students: " . $conn->error;
+} else {
+    $stmt->bind_param("i", $current_user_id);
+    $stmt->execute();
+    $students = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+}
 
 foreach ($students as &$student) {
     /*
@@ -33,6 +37,7 @@ foreach ($students as &$student) {
     */
 
     if ($student["brooder_id"]) {
+        $student["target_temp"] = 32.5;
         $reading = mock_live_reading($student["brooder_id"], $student["target_temp"]);
         $student["temperature"] = $reading["temperature"];
         $student["humidity"] = $reading["humidity"];
@@ -53,10 +58,11 @@ unset($student);
 <div class="container">
     <h1>My Students</h1>
     <div class="notice">Read-only view with mock live readings until the Raspberry Pi is connected.</div>
+    <?php if ($query_error): ?><div class="notice error"><?php echo htmlspecialchars($query_error); ?></div><?php endif; ?>
 
-    <?php if (empty($students)): ?>
+    <?php if (!$query_error && empty($students)): ?>
         <div class="notice">No students have been assigned to you yet.</div>
-    <?php else: ?>
+    <?php elseif (!$query_error): ?>
     <div class="cards">
         <?php foreach ($students as $s): ?>
         <div class="card">
